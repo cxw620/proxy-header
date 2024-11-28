@@ -1,13 +1,11 @@
-use std::io::Write;
-use std::net::SocketAddr;
-use std::str::from_utf8;
 use std::{
-    net::{Ipv4Addr, Ipv6Addr},
-    str::FromStr,
+    io::Write,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    str::{from_utf8, FromStr},
 };
 
-use crate::util::{read_until, AddressFamily};
 use crate::{
+    util::{read_until, AddressFamily},
     Error::{self, *},
     Protocol, ProxiedAddress, ProxyHeader,
 };

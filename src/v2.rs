@@ -1,12 +1,13 @@
-use std::borrow::Cow;
-use std::io::Write;
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::{
+    borrow::Cow,
+    io::Write,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+};
 
-use crate::util::AddressFamily;
-use crate::ParseConfig;
 use crate::{
+    util::AddressFamily,
     Error::{self, *},
-    Protocol, ProxiedAddress, ProxyHeader,
+    ParseConfig, Protocol, ProxiedAddress, ProxyHeader,
 };
 
 const GREETING: &[u8] = b"\r\n\r\n\x00\r\nQUIT\n";
@@ -181,8 +182,9 @@ pub fn encode<W: Write>(header: &ProxyHeader, buf: &mut W) -> Result<(), Error> 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::net::{SocketAddrV4, SocketAddrV6};
+
+    use super::*;
 
     #[test]
     fn test_encode_local() {

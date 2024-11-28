@@ -69,4 +69,5 @@ macro_rules! tlv_borrowed {
     }};
 }
 
-pub(crate) use {tlv, tlv_borrowed};
+pub(crate) use tlv;
+pub(crate) use tlv_borrowed;

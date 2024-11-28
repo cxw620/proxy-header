@@ -1,21 +1,26 @@
 //! IO wrapper for proxied streams.
 //!
-//! PROXY protocol header is variable length so it is not possible to read a fixed number of bytes
-//! directly from the stream and reading it byte-by-byte can be inefficient. [`ProxiedStream`] reads
-//! enough bytes to parse the header and retains any extra bytes that may have been read.
+//! PROXY protocol header is variable length so it is not possible to read a
+//! fixed number of bytes directly from the stream and reading it byte-by-byte
+//! can be inefficient. [`ProxiedStream`] reads enough bytes to parse the header
+//! and retains any extra bytes that may have been read.
 //!
-//! If the underlying stream is already buffered (i.e. [`std::io::BufRead`] or equivalent), it is
-//! probably a better idea to just decode the header directly instead of using [`ProxiedStream`].
+//! If the underlying stream is already buffered (i.e. [`std::io::BufRead`] or
+//! equivalent), it is probably a better idea to just decode the header directly
+//! instead of using [`ProxiedStream`].
 //!
-//! The wrapper is usable both with standard ([`std::io::Read`]) and Tokio streams ([`tokio::io::AsyncRead`]).
+//! The wrapper is usable both with standard ([`std::io::Read`]) and Tokio
+//! streams ([`tokio::io::AsyncRead`]).
 //!
 //! ## Example (Tokio)
 //!
 //! ```no_run
 //! # #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
-//! use tokio::net::TcpListener;
 //! use proxy_header::io::ProxiedStream;
+//! use tokio::{
+//!     io::{AsyncReadExt, AsyncWriteExt},
+//!     net::TcpListener,
+//! };
 //!
 //! let listener = TcpListener::bind("[::]:1234").await?;
 //!
@@ -43,14 +48,12 @@
 //! }
 //! # }
 //! ```
+#[cfg(any(unix, target_os = "wasi"))]
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 use std::{
     io::{self, BufRead, Read, Write},
     mem::MaybeUninit,
 };
-
-#[cfg(any(unix, target_os = "wasi"))]
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
-
 #[cfg(feature = "tokio")]
 use std::{
     pin::Pin,
@@ -59,7 +62,6 @@ use std::{
 
 #[cfg(feature = "tokio")]
 use pin_project_lite::pin_project;
-
 #[cfg(feature = "tokio")]
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
@@ -88,10 +90,11 @@ pub struct ProxiedStream<IO> {
 }
 
 impl<IO> ProxiedStream<IO> {
-    /// Create a new proxied stream from an stream that does not have a proxy header.
+    /// Create a new proxied stream from an stream that does not have a proxy
+    /// header.
     ///
-    /// This is useful if you want to use the same stream type for proxied and unproxied
-    /// connections.
+    /// This is useful if you want to use the same stream type for proxied and
+    /// unproxied connections.
     pub fn unproxied(io: IO) -> Self {
         Self {
             io,
@@ -133,16 +136,18 @@ impl<IO> ProxiedStream<IO>
 where
     IO: AsyncRead + Unpin,
 {
-    /// Reads the proxy header from an [`tokio::io::AsyncRead`] stream and returns a new [`ProxiedStream`].
+    /// Reads the proxy header from an [`tokio::io::AsyncRead`] stream and
+    /// returns a new [`ProxiedStream`].
     ///
-    /// This method will read from the stream until a proxy header is found, or the
-    /// stream is closed. If the stream is closed before a proxy header is found,
-    /// this method will return an [`io::Error`] with [`io::ErrorKind::UnexpectedEof`].
+    /// This method will read from the stream until a proxy header is found, or
+    /// the stream is closed. If the stream is closed before a proxy header
+    /// is found, this method will return an [`io::Error`] with
+    /// [`io::ErrorKind::UnexpectedEof`].
     ///
-    /// If the stream contains invalid data, this method will return an [`io::Error`]
-    /// with [`io::ErrorKind::InvalidData`]. In case of an error, the stream is dropped,
-    /// and any remaining bytes are discarded (which usually means the connection
-    /// is closed).
+    /// If the stream contains invalid data, this method will return an
+    /// [`io::Error`] with [`io::ErrorKind::InvalidData`]. In case of an
+    /// error, the stream is dropped, and any remaining bytes are discarded
+    /// (which usually means the connection is closed).
     pub async fn create_from_tokio(mut io: IO, config: ParseConfig) -> io::Result<Self> {
         use tokio::io::AsyncReadExt;
 
@@ -189,9 +194,11 @@ impl<IO> ProxiedStream<IO>
 where
     IO: Read,
 {
-    /// Reads the proxy header from a [`Read`] stream and returns a new `ProxiedStream`.
+    /// Reads the proxy header from a [`Read`] stream and returns a new
+    /// `ProxiedStream`.
     ///
-    /// Other than the fact that this method is synchronous, it is identical to [`create_from_tokio`](Self::create_from_tokio).
+    /// Other than the fact that this method is synchronous, it is identical to
+    /// [`create_from_tokio`](Self::create_from_tokio).
     pub fn create_from_std(mut io: IO, config: ParseConfig) -> io::Result<Self> {
         let mut bytes = Vec::with_capacity(256);
 
@@ -434,13 +441,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::{Protocol, ProxiedAddress, ProxyHeader};
     use std::{
         io::Cursor,
         net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     };
+
+    use super::*;
+    use crate::{Protocol, ProxiedAddress, ProxyHeader};
 
     #[test]
     fn test_sync() {

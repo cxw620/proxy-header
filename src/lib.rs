@@ -2,35 +2,39 @@
 //!
 //! This crate provides a decoder and encoder for the
 //! [PROXY protocol](https://www.haproxy.org/download/2.8/doc/proxy-protocol.txt),
-//! which is used to preserve original client connection information when proxying TCP
-//! connections for protocols that do not support this higher up in the stack.
+//! which is used to preserve original client connection information when
+//! proxying TCP connections for protocols that do not support this higher up in
+//! the stack.
 //!
-//! The PROXY protocol is supported by many load balancers and proxies, including HAProxy,
-//! Amazon ELB, Amazon ALB, and others.
+//! The PROXY protocol is supported by many load balancers and proxies,
+//! including HAProxy, Amazon ELB, Amazon ALB, and others.
 //!
-//! This crate implements the entire specification, except parsing the `AF_UNIX` address
-//! type (the header is validated / parsed, but the address is not decoded or exposed in
-//! the API).
+//! This crate implements the entire specification, except parsing the `AF_UNIX`
+//! address type (the header is validated / parsed, but the address is not
+//! decoded or exposed in the API).
 //!
 //! # Usage
 //!
 //! ## Decoding
 //!
-//! To decode a PROXY protocol header from an existing buffer, use [`ProxyHeader::parse`]:
-//! ```
+//! To decode a PROXY protocol header from an existing buffer, use
+//! [`ProxyHeader::parse`]: ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! use proxy_header::{ProxyHeader, ParseConfig};
+//! use proxy_header::{ParseConfig, ProxyHeader};
 //!
 //! let buf = b"PROXY TCP6 2001:db8:1::1 2001:db8:2::1 52953 25\r\nHELO example.com\r\n";
 //!
 //! let (header, len) = ProxyHeader::parse(buf, ParseConfig::default())?;
 //! match header.proxied_address() {
-//!    Some(addr) => {
-//!       println!("Proxied connection from {} to {}", addr.source, addr.destination);
-//!    }
-//!    None => {
-//!       println!("Local connection (e.g. healthcheck)");
-//!   }
+//!     Some(addr) => {
+//!         println!(
+//!             "Proxied connection from {} to {}",
+//!             addr.source, addr.destination
+//!         );
+//!     }
+//!     None => {
+//!         println!("Local connection (e.g. healthcheck)");
+//!     }
 //! }
 //!
 //! println!("Client sent: {:?}", &buf[len..]);
@@ -38,9 +42,10 @@
 //! # }
 //! ```
 //!
-//! In addition to the address information, the PROXY protocol version 2 header can contain
-//! additional information in the form of TLV (type-length-value) fields. These can be accessed
-//! through the [`ProxyHeader::tlvs`] iterator or through convenience accessors such as [`ProxyHeader::authority`].
+//! In addition to the address information, the PROXY protocol version 2 header
+//! can contain additional information in the form of TLV (type-length-value)
+//! fields. These can be accessed through the [`ProxyHeader::tlvs`] iterator or
+//! through convenience accessors such as [`ProxyHeader::authority`].
 //!
 //! See [`Tlv`] for more information on the different types of TLV fields.
 //!
@@ -52,7 +57,8 @@
 //! use proxy_header::Tlv;
 //!
 //! for tlv in header.tlvs() {
-//!     match tlv? {  // TLV can be malformed
+//!     match tlv? {
+//!         // TLV can be malformed
 //!         Tlv::UniqueId(v) => {
 //!             println!("Unique connection ID: {:?}", v);
 //!         }
@@ -66,19 +72,20 @@
 //! # }
 //! ```
 //!
-//! See also [`io`] module for a stream wrapper that can automatically parse PROXY protocol.
+//! See also [`io`] module for a stream wrapper that can automatically parse
+//! PROXY protocol.
 //!
 //! ## Encoding
 //!
-//! To encode a PROXY protocol header, use [`ProxyHeader::encode_v1`] for version 1 headers and
-//! [`ProxyHeader::encode_v2`] for version 2 headers.
+//! To encode a PROXY protocol header, use [`ProxyHeader::encode_v1`] for
+//! version 1 headers and [`ProxyHeader::encode_v2`] for version 2 headers.
 //!
 //! ```
-//! use proxy_header::{ProxyHeader, ProxiedAddress, Protocol};
+//! use proxy_header::{Protocol, ProxiedAddress, ProxyHeader};
 //!
 //! let addrs = ProxiedAddress::stream(
-//!    "[2001:db8::1:1]:51234".parse().unwrap(),
-//!    "[2001:db8::2:1]:443".parse().unwrap()
+//!     "[2001:db8::1:1]:51234".parse().unwrap(),
+//!     "[2001:db8::2:1]:443".parse().unwrap(),
 //! );
 //! let header = ProxyHeader::with_address(addrs);
 //!
@@ -94,10 +101,9 @@ mod v2;
 
 pub mod io;
 
+use std::{borrow::Cow, fmt, net::SocketAddr};
+
 use crate::util::{tlv, tlv_borrowed};
-use std::borrow::Cow;
-use std::fmt;
-use std::net::SocketAddr;
 
 /// Protocol type
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -175,7 +181,7 @@ impl<'a> Iterator for Tlvs<'a> {
 #[derive(PartialEq, Eq, Clone)]
 pub struct SslInfo<'a>(u8, u32, Cow<'a, [u8]>);
 
-impl<'a> SslInfo<'a> {
+impl SslInfo<'_> {
     /// Create a new SSL information struct
     pub fn new(
         client_ssl: bool,
@@ -192,18 +198,18 @@ impl<'a> SslInfo<'a> {
 
     /// Client connected over SSL/TLS
     ///
-    /// The PP2_CLIENT_SSL flag indicates that the client connected over SSL/TLS. When
-    /// this field is present, the US-ASCII string representation of the TLS version is
-    /// appended at the end of the field in the TLV format using the type
-    /// PP2_SUBTYPE_SSL_VERSION.
+    /// The PP2_CLIENT_SSL flag indicates that the client connected over
+    /// SSL/TLS. When this field is present, the US-ASCII string
+    /// representation of the TLS version is appended at the end of the
+    /// field in the TLV format using the type PP2_SUBTYPE_SSL_VERSION.
     pub fn client_ssl(&self) -> bool {
         self.0 & 0x01 != 0
     }
 
     /// Client certificate presented in the connection
     ///
-    /// PP2_CLIENT_CERT_CONN indicates that the client provided a certificate over the
-    /// current connection.
+    /// PP2_CLIENT_CERT_CONN indicates that the client provided a certificate
+    /// over the current connection.
     pub fn client_cert_conn(&self) -> bool {
         self.0 & 0x02 != 0
     }
@@ -211,7 +217,8 @@ impl<'a> SslInfo<'a> {
     /// Client certificate presented in the session
     ///
     /// PP2_CLIENT_CERT_SESS indicates that the client provided a
-    /// certificate at least once over the TLS session this connection belongs to.
+    /// certificate at least once over the TLS session this connection belongs
+    /// to.
     pub fn client_cert_sess(&self) -> bool {
         self.0 & 0x04 != 0
     }
@@ -293,64 +300,70 @@ impl fmt::Debug for SslInfo<'_> {
 
 /// Typed TLV (type-length-value) field
 ///
-/// Represents the currently known types of TLV fields from the PROXY protocol specification.
-/// Non-recognized TLV fields are represented as [`Tlv::Custom`].
+/// Represents the currently known types of TLV fields from the PROXY protocol
+/// specification. Non-recognized TLV fields are represented as [`Tlv::Custom`].
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Tlv<'a> {
-    /// Application-Layer Protocol Negotiation (ALPN). It is a byte sequence defining
-    /// the upper layer protocol in use over the connection. The most common use case
-    /// will be to pass the exact copy of the ALPN extension of the Transport Layer
-    /// Security (TLS) protocol as defined by RFC7301.
+    /// Application-Layer Protocol Negotiation (ALPN). It is a byte sequence
+    /// defining the upper layer protocol in use over the connection. The
+    /// most common use case will be to pass the exact copy of the ALPN
+    /// extension of the Transport Layer Security (TLS) protocol as defined
+    /// by RFC7301.
     Alpn(Cow<'a, [u8]>),
 
-    /// Contains the host name value passed by the client, as an UTF8-encoded string.
-    /// In case of TLS being used on the client connection, this is the exact copy of
-    /// the "server_name" extension as defined by RFC3546, section 3.1, often
-    /// referred to as "SNI". There are probably other situations where an authority
-    /// can be mentioned on a connection without TLS being involved at all.
+    /// Contains the host name value passed by the client, as an UTF8-encoded
+    /// string. In case of TLS being used on the client connection, this is
+    /// the exact copy of the "server_name" extension as defined by RFC3546,
+    /// section 3.1, often referred to as "SNI". There are probably other
+    /// situations where an authority can be mentioned on a connection
+    /// without TLS being involved at all.
     Authority(Cow<'a, str>),
 
-    /// The value of the type PP2_TYPE_CRC32C is a 32-bit number storing the CRC32c
-    /// checksum of the PROXY protocol header.
+    /// The value of the type PP2_TYPE_CRC32C is a 32-bit number storing the
+    /// CRC32c checksum of the PROXY protocol header.
     ///
-    /// When the checksum is supported by the sender after constructing the header
-    /// the sender MUST:
+    /// When the checksum is supported by the sender after constructing the
+    /// header the sender MUST:
     ///
     /// - initialize the checksum field to '0's.
     ///
-    /// - calculate the CRC32c checksum of the PROXY header as described in RFC4960,
-    /// Appendix B.
+    /// - calculate the CRC32c checksum of the PROXY header as described in
+    ///   RFC4960, Appendix B.
     ///
     /// - put the resultant value into the checksum field, and leave the rest of
-    /// the bits unchanged.
+    ///   the bits unchanged.
     ///
     /// If the checksum is provided as part of the PROXY header and the checksum
     /// functionality is supported by the receiver, the receiver MUST:
     ///
     /// - store the received CRC32c checksum value aside.
     ///
-    /// - replace the 32 bits of the checksum field in the received PROXY header with
-    /// all '0's and calculate a CRC32c checksum value of the whole PROXY header.
+    /// - replace the 32 bits of the checksum field in the received PROXY header
+    ///   with all '0's and calculate a CRC32c checksum value of the whole PROXY
+    ///   header.
     ///
     /// - verify that the calculated CRC32c checksum is the same as the received
-    /// CRC32c checksum. If it is not, the receiver MUST treat the TCP connection
-    /// providing the header as invalid.
+    ///   CRC32c checksum. If it is not, the receiver MUST treat the TCP
+    ///   connection providing the header as invalid.
     ///
-    /// The default procedure for handling an invalid TCP connection is to abort it.
+    /// The default procedure for handling an invalid TCP connection is to abort
+    /// it.
     Crc32c(u32),
 
-    /// The TLV of this type should be ignored when parsed. The value is zero or more
-    /// bytes. Can be used for data padding or alignment. Note that it can be used
-    /// to align only by 3 or more bytes because a TLV can not be smaller than that.
+    /// The TLV of this type should be ignored when parsed. The value is zero or
+    /// more bytes. Can be used for data padding or alignment. Note that it
+    /// can be used to align only by 3 or more bytes because a TLV can not
+    /// be smaller than that.
     Noop(usize),
 
-    /// The value of the type PP2_TYPE_UNIQUE_ID is an opaque byte sequence of up to
-    /// 128 bytes generated by the upstream proxy that uniquely identifies the
-    /// connection.
+    /// The value of the type PP2_TYPE_UNIQUE_ID is an opaque byte sequence of
+    /// up to 128 bytes generated by the upstream proxy that uniquely
+    /// identifies the connection.
     ///
-    /// The unique ID can be used to easily correlate connections across multiple
-    /// layers of proxies, without needing to look up IP addresses and port numbers.
+    /// The unique ID can be used to easily correlate connections across
+    /// multiple layers of proxies, without needing to look up IP addresses
+    /// and port numbers.
     UniqueId(Cow<'a, [u8]>),
 
     /// SSL (TLS) information
@@ -358,33 +371,34 @@ pub enum Tlv<'a> {
     /// See [`SslInfo`] for more information.
     Ssl(SslInfo<'a>),
 
-    /// The type PP2_TYPE_NETNS defines the value as the US-ASCII string representation
-    /// of the namespace's name.
+    /// The type PP2_TYPE_NETNS defines the value as the US-ASCII string
+    /// representation of the namespace's name.
     Netns(Cow<'a, str>),
 
     // These can only appear as a sub-TLV of SslInfo
     /// SSL/TLS version
     SslVersion(Cow<'a, str>),
 
-    /// In all cases, the string representation (in UTF8) of the Common Name field
-    /// (OID: 2.5.4.3) of the client certificate's Distinguished Name, is appended
-    /// using the TLV format and the type PP2_SUBTYPE_SSL_CN. E.g. "example.com".
+    /// In all cases, the string representation (in UTF8) of the Common Name
+    /// field (OID: 2.5.4.3) of the client certificate's Distinguished Name,
+    /// is appended using the TLV format and the type PP2_SUBTYPE_SSL_CN.
+    /// E.g. "example.com".
     SslCn(Cow<'a, str>),
 
-    /// The second level TLV PP2_SUBTYPE_SSL_CIPHER provides the US-ASCII string name
-    /// of the used cipher, for example "ECDHE-RSA-AES128-GCM-SHA256".
+    /// The second level TLV PP2_SUBTYPE_SSL_CIPHER provides the US-ASCII string
+    /// name of the used cipher, for example "ECDHE-RSA-AES128-GCM-SHA256".
     SslCipher(Cow<'a, str>),
 
-    /// The second level TLV PP2_SUBTYPE_SSL_SIG_ALG provides the US-ASCII string name
-    /// of the algorithm used to sign the certificate presented by the frontend when
-    /// the incoming connection was made over an SSL/TLS transport layer, for example
-    /// "SHA256".
+    /// The second level TLV PP2_SUBTYPE_SSL_SIG_ALG provides the US-ASCII
+    /// string name of the algorithm used to sign the certificate presented
+    /// by the frontend when the incoming connection was made over an
+    /// SSL/TLS transport layer, for example "SHA256".
     SslSigAlg(Cow<'a, str>),
 
-    /// The second level TLV PP2_SUBTYPE_SSL_KEY_ALG provides the US-ASCII string name
-    /// of the algorithm used to generate the key of the certificate presented by the
-    /// frontend when the incoming connection was made over an SSL/TLS transport layer,
-    /// for example "RSA2048".
+    /// The second level TLV PP2_SUBTYPE_SSL_KEY_ALG provides the US-ASCII
+    /// string name of the algorithm used to generate the key of the
+    /// certificate presented by the frontend when the incoming connection
+    /// was made over an SSL/TLS transport layer, for example "RSA2048".
     SslKeyAlg(Cow<'a, str>),
 
     /// Unrecognized or custom TLV field
@@ -397,6 +411,7 @@ impl<'a> Tlv<'a> {
     /// Returns an error if the field is malformed.
     pub fn decode(kind: u8, data: &'a [u8]) -> Result<Tlv<'a>, Error> {
         use std::str::from_utf8;
+
         use Tlv::*;
 
         match kind {
@@ -520,8 +535,8 @@ impl<'a> Tlv<'a> {
 pub struct ParseConfig {
     /// Whether to include TLV (type-length-value) fields in the parsed header
     ///
-    /// Even though the TLV section is parsed lazily when accessed, this can save
-    /// an allocation.
+    /// Even though the TLV section is parsed lazily when accessed, this can
+    /// save an allocation.
     pub include_tlvs: bool,
 
     /// Whether to allow V1 headers
@@ -559,17 +574,18 @@ impl<'a> ProxyHeader<'a> {
     /// Create a new PROXY protocol header with the given TLV fields
     ///
     /// ```
-    /// use proxy_header::{ProxyHeader, ProxiedAddress, Tlv, Protocol, SslInfo};
+    /// use proxy_header::{Protocol, ProxiedAddress, ProxyHeader, SslInfo, Tlv};
     ///
     /// let addrs = ProxiedAddress::stream(
     ///     "[2001:db8::1:1]:51234".parse().unwrap(),
-    ///     "[2001:db8::2:1]:443".parse().unwrap()
+    ///     "[2001:db8::2:1]:443".parse().unwrap(),
     /// );
     /// let header = ProxyHeader::with_tlvs(
-    ///    Some(addrs), [
+    ///     Some(addrs),
+    ///     [
     ///         Tlv::Authority("example.com".into()),
     ///         Tlv::Ssl(SslInfo::new(true, false, false, 0)),
-    ///      ]
+    ///     ],
     /// );
     ///
     /// println!("{:?}", header);
@@ -588,13 +604,15 @@ impl<'a> ProxyHeader<'a> {
 
     /// Attempt to parse a PROXY protocol header from the given buffer
     ///
-    /// Returns the parsed header and the number of bytes consumed from the buffer. If the header
-    /// is incomplete, returns [`Error::BufferTooShort`] so more data can be read from the socket.
+    /// Returns the parsed header and the number of bytes consumed from the
+    /// buffer. If the header is incomplete, returns
+    /// [`Error::BufferTooShort`] so more data can be read from the socket.
     ///
     /// If the header is malformed or unsupported, returns [`Error::Invalid`].
     ///
-    /// This function will borrow the buffer for the lifetime of the returned header. If
-    /// you need to keep the header around for longer than the buffer, use [`ProxyHeader::into_owned`].
+    /// This function will borrow the buffer for the lifetime of the returned
+    /// header. If you need to keep the header around for longer than the
+    /// buffer, use [`ProxyHeader::into_owned`].
     pub fn parse(buf: &'a [u8], config: ParseConfig) -> Result<(Self, usize), Error> {
         match buf.first() {
             Some(b'P') if config.allow_v1 => v1::decode(buf),
@@ -606,14 +624,15 @@ impl<'a> ProxyHeader<'a> {
 
     /// Proxied address information
     ///
-    /// If `None`, this indicates so-called "local" mode, where the connection is not proxied.
-    /// This is usually the case when the connection is initiated by the proxy itself, e.g. for
-    /// health checks.
+    /// If `None`, this indicates so-called "local" mode, where the connection
+    /// is not proxied. This is usually the case when the connection is
+    /// initiated by the proxy itself, e.g. for health checks.
     pub fn proxied_address(&self) -> Option<&ProxiedAddress> {
         self.0.as_ref()
     }
 
-    /// Iterator that yields all extension TLV (type-length-value) fields present in the header
+    /// Iterator that yields all extension TLV (type-length-value) fields
+    /// present in the header
     ///
     /// See [`Tlv`] for more information on the different types of TLV fields.
     pub fn tlvs(&self) -> Tlvs<'_> {
@@ -676,9 +695,10 @@ impl<'a> ProxyHeader<'a> {
 
     /// Encode this PROXY protocol header into a [`Vec`] in version 1 format.
     ///
-    /// Returns [`Error::V1UnsupportedTlv`] if the header contains any TLV fields and
-    /// [`Error::V1UnsupportedProtocol`] if the header contains a non-TCP protocol, as
-    /// version 1 PROXY protocol does not support either of these.
+    /// Returns [`Error::V1UnsupportedTlv`] if the header contains any TLV
+    /// fields and [`Error::V1UnsupportedProtocol`] if the header contains a
+    /// non-TCP protocol, as version 1 PROXY protocol does not support
+    /// either of these.
     pub fn encode_v1(&self, buf: &mut Vec<u8>) -> Result<(), Error> {
         v1::encode(self, buf)
     }
@@ -688,9 +708,11 @@ impl<'a> ProxyHeader<'a> {
         v2::encode(self, buf)
     }
 
-    /// Encode this PROXY protocol header into an existing buffer in version 1 format.
+    /// Encode this PROXY protocol header into an existing buffer in version 1
+    /// format.
     ///
-    /// If the buffer is too small to contain the entire header, returns [`Error::BufferTooShort`].
+    /// If the buffer is too small to contain the entire header, returns
+    /// [`Error::BufferTooShort`].
     ///
     /// See [`ProxyHeader::encode_v1`] for more information.
     pub fn encode_to_slice_v1(&self, buf: &mut [u8]) -> Result<usize, Error> {
@@ -700,9 +722,11 @@ impl<'a> ProxyHeader<'a> {
         Ok(cursor.position() as usize)
     }
 
-    /// Encode this PROXY protocol header into an existing buffer in version 2 format.
+    /// Encode this PROXY protocol header into an existing buffer in version 2
+    /// format.
     ///
-    /// If the buffer is too small to contain the entire header, returns [`Error::BufferTooShort`].
+    /// If the buffer is too small to contain the entire header, returns
+    /// [`Error::BufferTooShort`].
     ///
     /// See [`ProxyHeader::encode_v2`] for more information.
     pub fn encode_to_slice_v2(&self, buf: &mut [u8]) -> Result<usize, Error> {
@@ -730,11 +754,14 @@ pub enum Error {
     Invalid,
     /// The source and destination address families do not match
     AddressFamilyMismatch,
-    /// The total size of the PROXY protocol header would exceed the maximum allowed size
+    /// The total size of the PROXY protocol header would exceed the maximum
+    /// allowed size
     HeaderTooBig,
-    /// The PROXY protocol header contains a TLV field, which is not supported in version 1
+    /// The PROXY protocol header contains a TLV field, which is not supported
+    /// in version 1
     V1UnsupportedTlv,
-    /// The PROXY protocol header contains a non-TCP protocol, which is not supported in version 1
+    /// The PROXY protocol header contains a non-TCP protocol, which is not
+    /// supported in version 1
     V1UnsupportedProtocol,
 }
 
@@ -809,10 +836,7 @@ mod tests {
                 ));
             }
 
-            assert!(matches!(
-                ProxyHeader::parse(case, Default::default()),
-                Ok(_)
-            ));
+            assert!(ProxyHeader::parse(case, Default::default()).is_ok());
         }
     }
 
